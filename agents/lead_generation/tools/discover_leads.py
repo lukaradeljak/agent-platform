@@ -33,7 +33,7 @@ def run():
 
     inserted = 0
     attempted_cities = []
-    max_city_attempts = 4
+    max_city_attempts = 10
 
     while inserted < LEADS_PER_DAY and len(attempted_cities) < max_city_attempts:
         city_data = get_next_city()
