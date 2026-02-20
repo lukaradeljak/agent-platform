@@ -13,6 +13,9 @@ RUN pip install --no-cache-dir -r agents/example_agent/requirements.txt || true
 COPY agents/lead_generation/requirements.txt agents/lead_generation/requirements.txt
 RUN pip install --no-cache-dir -r agents/lead_generation/requirements.txt
 
+COPY agents/onboarding_clients/requirements.txt agents/onboarding_clients/requirements.txt
+RUN pip install --no-cache-dir -r agents/onboarding_clients/requirements.txt
+
 # Copiar el código del proyecto
 # El contexto del build es la raíz del proyecto (ver docker-compose.yml)
 COPY scheduler/ scheduler/
