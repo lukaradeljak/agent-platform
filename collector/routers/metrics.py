@@ -63,21 +63,24 @@ async def push_metrics(
 @router.get("", response_model=list[AgentRunSummary])
 async def get_metrics(
     agent_name: str | None = Query(None, description="Filtrar por nombre de agente"),
+    started_after: datetime | None = Query(None, description="Solo runs con started_at posterior a esta fecha (ISO 8601)"),
     limit: int = Query(50, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
 ) -> list[AgentRunSummary]:
     """
     Retorna runs recientes con sus métricas.
-    Útil para el web app y para debugging manual.
+    Útil para el web app, sync con Supabase y debugging manual.
     """
     stmt = (
         select(AgentRun)
         .options(selectinload(AgentRun.metrics))
-        .order_by(AgentRun.started_at.desc())
+        .order_by(AgentRun.started_at.asc())
         .limit(limit)
     )
     if agent_name:
         stmt = stmt.where(AgentRun.agent_name == agent_name)
+    if started_after:
+        stmt = stmt.where(AgentRun.started_at > started_after)
 
     result = await db.execute(stmt)
     runs = result.scalars().all()
