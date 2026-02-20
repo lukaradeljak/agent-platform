@@ -16,7 +16,7 @@ app = Celery(
     "agent_platform",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["tasks.runner"],
+    include=["scheduler.tasks.runner"],
 )
 
 app.conf.timezone = "UTC"
@@ -36,13 +36,13 @@ app.conf.accept_content = ["json"]
 #
 app.conf.beat_schedule = {
     "run-example-agent-every-hour": {
-        "task": "tasks.runner.run_agent",
+        "task": "scheduler.tasks.runner.run_agent",
         "schedule": crontab(minute=0),
         "args": ("example_agent",),
     },
     # Agregar más agentes aquí:
     # "run-mi-agente-cada-15min": {
-    #     "task": "tasks.runner.run_agent",
+    #     "task": "scheduler.tasks.runner.run_agent",
     #     "schedule": crontab(minute="*/15"),
     #     "args": ("mi_agente",),
     # },

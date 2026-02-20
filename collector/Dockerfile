@@ -4,9 +4,13 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
+COPY collector/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY collector/ collector/
+COPY migrations/ migrations/
+COPY migrations/alembic.ini alembic.ini
+
+ENV PYTHONPATH=/app
 
 CMD ["uvicorn", "collector.main:app", "--host", "0.0.0.0", "--port", "8000"]

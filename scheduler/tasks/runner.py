@@ -12,7 +12,7 @@ from celery import shared_task
     bind=True,
     max_retries=3,
     default_retry_delay=60,  # 60 segundos entre reintentos
-    name="tasks.runner.run_agent",
+    name="scheduler.tasks.runner.run_agent",
 )
 def run_agent(self, agent_name: str) -> dict:
     """
