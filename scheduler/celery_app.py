@@ -41,10 +41,10 @@ app.conf.beat_schedule = {
         "schedule": crontab(hour=9, minute=0, day_of_week="1-5"),
         "args": ("lead_generation",),
     },
-    # Onboarding Clients: cada 5 minutos (detecta deals ganados en HubSpot)
+    # Onboarding Clients: cada 1 minuto (detecta deals ganados en HubSpot)
     "run-onboarding-clients-polling": {
         "task": "scheduler.tasks.runner.run_agent",
-        "schedule": crontab(minute="*/5"),
+        "schedule": crontab(),
         "args": ("onboarding_clients",),
     },
 }
