@@ -35,15 +35,10 @@ app.conf.accept_content = ["json"]
 #   60.0                        → cada 60 segundos
 #
 app.conf.beat_schedule = {
-    "run-example-agent-every-hour": {
+    # Lead Generation: lunes a viernes a las 09:00 UTC (06:00 ART)
+    "run-lead-generation-daily": {
         "task": "scheduler.tasks.runner.run_agent",
-        "schedule": crontab(minute=0),
-        "args": ("example_agent",),
+        "schedule": crontab(hour=9, minute=0, day_of_week="1-5"),
+        "args": ("lead_generation",),
     },
-    # Agregar más agentes aquí:
-    # "run-mi-agente-cada-15min": {
-    #     "task": "scheduler.tasks.runner.run_agent",
-    #     "schedule": crontab(minute="*/15"),
-    #     "args": ("mi_agente",),
-    # },
 }

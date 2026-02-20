@@ -7,9 +7,11 @@ COPY scheduler/requirements.txt scheduler/requirements.txt
 RUN pip install --no-cache-dir -r scheduler/requirements.txt
 
 # Instalar dependencias de cada agente
-# Agregar una línea por cada agente con dependencias propias:
 COPY agents/example_agent/requirements.txt agents/example_agent/requirements.txt
 RUN pip install --no-cache-dir -r agents/example_agent/requirements.txt || true
+
+COPY agents/lead_generation/requirements.txt agents/lead_generation/requirements.txt
+RUN pip install --no-cache-dir -r agents/lead_generation/requirements.txt
 
 # Copiar el código del proyecto
 # El contexto del build es la raíz del proyecto (ver docker-compose.yml)

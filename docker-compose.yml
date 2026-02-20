@@ -7,6 +7,7 @@ networks:
 volumes:
   postgres_data:
   redis_data:
+  agent_tmp_data:
 
 services:
 
@@ -79,10 +80,13 @@ services:
       collector:
         condition: service_healthy
     environment:
-      REDIS_URL:          ${REDIS_URL}
-      COLLECTOR_URL:      http://collector:8000
-      OPENAI_API_KEY:     ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY:-}
+      REDIS_URL:        ${REDIS_URL}
+      COLLECTOR_URL:    http://collector:8000
+      PIPELINE_TMP_DIR: /app/.tmp
+    volumes:
+      - agent_tmp_data:/app/.tmp
+      # Cada agente monta su propio .env (no va al git):
+      - ./agents/lead_generation/.env:/app/agents/lead_generation/.env:ro
     command: celery -A scheduler.celery_app beat --loglevel=info
 
   # ─── Celery Worker (Executor) ────────────────────────────────────────
@@ -99,10 +103,13 @@ services:
       collector:
         condition: service_healthy
     environment:
-      REDIS_URL:          ${REDIS_URL}
-      COLLECTOR_URL:      http://collector:8000
-      OPENAI_API_KEY:     ${OPENAI_API_KEY:-}
-      ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY:-}
+      REDIS_URL:        ${REDIS_URL}
+      COLLECTOR_URL:    http://collector:8000
+      PIPELINE_TMP_DIR: /app/.tmp
+    volumes:
+      - agent_tmp_data:/app/.tmp
+      # Cada agente monta su propio .env (no va al git):
+      - ./agents/lead_generation/.env:/app/agents/lead_generation/.env:ro
     command: >
       celery -A scheduler.celery_app worker
         --loglevel=info
