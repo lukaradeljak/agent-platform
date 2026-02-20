@@ -1,0 +1,9 @@
+# Dependencias específicas de este agente.
+# Agregar aquí los paquetes que necesita solo este agente.
+# También actualizar scheduler/Dockerfile para instalarlos.
+
+# Ejemplos:
+# langchain>=0.3.0
+# langgraph>=0.2.0
+# openai>=1.0.0
+# httpx>=0.27.0

@@ -1,0 +1,144 @@
+version: "3.9"
+
+networks:
+  platform_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+
+services:
+
+  # ─── Infraestructura ────────────────────────────────────────────────
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    networks: [platform_net]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB:       ${POSTGRES_DB}
+      POSTGRES_USER:     ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "127.0.0.1:5432:5432"   # Expuesto solo en loopback. Firewall controla acceso externo.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    networks: [platform_net]
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Collector (FastAPI) ─────────────────────────────────────────────
+
+  collector:
+    build:
+      context: ./collector
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    networks: [platform_net]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SECRET_KEY:   ${COLLECTOR_SECRET_KEY}
+    ports:
+      - "127.0.0.1:8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ─── Celery Beat (Scheduler) ─────────────────────────────────────────
+
+  celery_beat:
+    build:
+      context: .
+      dockerfile: scheduler/Dockerfile
+    restart: unless-stopped
+    networks: [platform_net]
+    depends_on:
+      redis:
+        condition: service_healthy
+      collector:
+        condition: service_healthy
+    environment:
+      REDIS_URL:          ${REDIS_URL}
+      COLLECTOR_URL:      http://collector:8000
+      OPENAI_API_KEY:     ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY:-}
+    command: celery -A celery_app beat --loglevel=info
+
+  # ─── Celery Worker (Executor) ────────────────────────────────────────
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: scheduler/Dockerfile
+    restart: unless-stopped
+    networks: [platform_net]
+    depends_on:
+      redis:
+        condition: service_healthy
+      collector:
+        condition: service_healthy
+    environment:
+      REDIS_URL:          ${REDIS_URL}
+      COLLECTOR_URL:      http://collector:8000
+      OPENAI_API_KEY:     ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY:  ${ANTHROPIC_API_KEY:-}
+    command: >
+      celery -A celery_app worker
+        --loglevel=info
+        --concurrency=4
+        --queues=default
+    # Escalar: docker compose up -d --scale celery_worker=5
+
+  # ─── Flower (Monitoreo de Celery) ────────────────────────────────────
+
+  flower:
+    build:
+      context: .
+      dockerfile: scheduler/Dockerfile
+    restart: unless-stopped
+    networks: [platform_net]
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_URL:          ${REDIS_URL}
+      FLOWER_BASIC_AUTH:  ${FLOWER_USER}:${FLOWER_PASSWORD}
+    command: celery -A celery_app flower --port=5555
+    ports:
+      - "127.0.0.1:5555:5555"
+
+  # ─── Nginx (TLS + Routing) ───────────────────────────────────────────
+
+  nginx:
+    image: nginx:alpine
+    restart: unless-stopped
+    networks: [platform_net]
+    depends_on: [collector, flower]
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      # Descomenta si usas Let's Encrypt:
+      # - /etc/letsencrypt:/etc/letsencrypt:ro
+    ports:
+      - "80:80"
+      - "443:443"
