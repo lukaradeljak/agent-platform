@@ -36,10 +36,10 @@ app.conf.task_default_queue = "default"
 #   60.0                        → cada 60 segundos
 #
 app.conf.beat_schedule = {
-    # Lead Generation: lunes a viernes a las 09:00 UTC (06:00 ART)
+    # Lead Generation: lunes a viernes a las 09:00 ART (12:00 UTC)
     "run-lead-generation-daily": {
         "task": "scheduler.tasks.runner.run_agent",
-        "schedule": crontab(hour=9, minute=0, day_of_week="1-5"),
+        "schedule": crontab(hour=12, minute=0, day_of_week="1-5"),
         "args": ("lead_generation",),
     },
     # Onboarding Clients: cada 1 minuto (detecta deals ganados en HubSpot)
