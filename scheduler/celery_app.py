@@ -23,6 +23,7 @@ app.conf.timezone = "UTC"
 app.conf.task_serializer = "json"
 app.conf.result_serializer = "json"
 app.conf.accept_content = ["json"]
+app.conf.task_default_queue = "default"
 
 # ─── Schedule de agentes ────────────────────────────────────────────────────
 # Agregar una entrada por cada agente que quieras agendar.
