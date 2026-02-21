@@ -135,6 +135,31 @@ def get_user_id_by_email(email: str) -> str | None:
     return users[0]["id"] if users else None
 
 
+def generate_magic_link(*, email: str, app_url: str) -> str:
+    """
+    Genera un magic link que lleva directamente a /auth/confirm → /update-password.
+    El usuario hace un click y puede crear su contraseña sin necesidad de recordar
+    la contraseña temporal.
+
+    Retorna la URL completa lista para incluir en el email.
+    """
+    url = f"{_supabase_url()}/auth/v1/admin/generate_link"
+    payload = {"type": "magiclink", "email": email}
+
+    resp = requests.post(url, headers=_admin_headers(), json=payload, timeout=30)
+    if resp.status_code >= 400:
+        raise RuntimeError(
+            f"Supabase generate_link (magiclink) failed ({resp.status_code}): {resp.text}"
+        )
+
+    hashed_token = resp.json().get("hashed_token", "")
+    if not hashed_token:
+        raise RuntimeError("Supabase generate_link: missing hashed_token in response")
+
+    app_base = app_url.rstrip("/")
+    return f"{app_base}/auth/confirm?token_hash={hashed_token}&type=magiclink&next=/update-password"
+
+
 def create_or_update_user_with_password(
     *,
     email: str,

@@ -63,7 +63,7 @@ def _send_via_smtp(msg: MIMEMultipart) -> None:
         raise RuntimeError(f"No se pudo enviar email via SMTP (465/587): {e}") from last_err
 
 
-def _build_onboarding_html(client_name: str, client_email: str = "", temp_password: str = "") -> str:
+def _build_onboarding_html(client_name: str, client_email: str = "", temp_password: str = "", setup_url: str = "") -> str:
     """Genera el HTML del email de onboarding alineado al brand ACEM."""
     return f"""\
 <!DOCTYPE html>
@@ -96,28 +96,29 @@ __PAYMENT_SECTION__
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #182033; border-radius: 8px;">
       <tr><td style="padding: 20px 24px;">
         <p style="font-family: 'Manrope', Arial, sans-serif; color: #00E5FF; font-size: 13px; font-weight: bold; margin: 0 0 8px; letter-spacing: 0.5px;">
-          PASO __PASSWORD_STEP_NUM__ &mdash; ACCEDE A TU PANEL
-        </p>
-        <p style="font-family: 'Inter', Arial, sans-serif; color: #8899B0; font-size: 14px; line-height: 1.6; margin: 0 0 12px;">
-          Usa estas credenciales para acceder a tu panel:
-        </p>
-        <p style="font-family: 'Inter', Arial, sans-serif; color: #8899B0; font-size: 14px; line-height: 1.6; margin: 0 0 4px;">
-          <strong style="color: #E8EDF5;">Email:</strong> {client_email}
+          PASO __PASSWORD_STEP_NUM__ &mdash; CREA TU CONTRASE&Ntilde;A
         </p>
         <p style="font-family: 'Inter', Arial, sans-serif; color: #8899B0; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
-          <strong style="color: #E8EDF5;">Contrase&ntilde;a temporal:</strong>&nbsp;
-          <code style="background: #0e1320; color: #00E5FF; padding: 3px 10px; border-radius: 4px; font-size: 15px; letter-spacing: 1px;">{temp_password}</code>
+          Hac&eacute; click en el bot&oacute;n para ingresar a tu panel y crear tu contrase&ntilde;a.
+          El link es v&aacute;lido por 24 horas.
         </p>
-        <table cellpadding="0" cellspacing="0"><tr><td style="border: 1.5px solid #00E5FF; border-radius: 6px;">
-          <a href="__LOGIN_URL__"
-             style="display: inline-block; color: #00E5FF; padding: 12px 32px;
+        <table cellpadding="0" cellspacing="0"><tr><td style="background-color: #00E5FF; border-radius: 6px;">
+          <a href="__SETUP_URL__"
+             style="display: inline-block; color: #121A2E; padding: 12px 32px;
                     text-decoration: none; font-family: 'Manrope', Arial, sans-serif;
                     font-size: 14px; font-weight: bold; letter-spacing: 0.5px;">
-            Iniciar sesi&oacute;n
+            Crear contrase&ntilde;a
           </a>
         </td></tr></table>
-        <p style="font-family: 'Inter', Arial, sans-serif; color: #5a6a80; font-size: 12px; line-height: 1.5; margin: 12px 0 0;">
-          Pod&eacute;s cambiar tu contrase&ntilde;a desde la configuraci&oacute;n de tu perfil una vez que ingreses.
+        <p style="font-family: 'Inter', Arial, sans-serif; color: #5a6a80; font-size: 12px; line-height: 1.5; margin: 16px 0 4px;">
+          &iquest;El link expir&oacute;? Ingres&aacute; con tu contrase&ntilde;a temporal:
+        </p>
+        <p style="font-family: 'Inter', Arial, sans-serif; color: #8899B0; font-size: 13px; line-height: 1.6; margin: 0 0 2px;">
+          <strong style="color: #E8EDF5;">Email:</strong> {client_email}
+        </p>
+        <p style="font-family: 'Inter', Arial, sans-serif; color: #8899B0; font-size: 13px; line-height: 1.6; margin: 0;">
+          <strong style="color: #E8EDF5;">Contrase&ntilde;a temporal:</strong>&nbsp;
+          <code style="background: #0e1320; color: #00E5FF; padding: 2px 8px; border-radius: 4px; font-size: 13px; letter-spacing: 1px;">{temp_password}</code>
         </p>
       </td></tr>
     </table>
@@ -154,6 +155,7 @@ def send_onboarding_email(
     payment_url: str = "",
     client_email: str = "",
     temp_password: str = "",
+    setup_url: str = "",
 ) -> bool:
     """
     Envía el email de onboarding con enlace de pago y PDF adjunto.
@@ -167,7 +169,7 @@ def send_onboarding_email(
 
     # HTML body
     html_part = MIMEMultipart("alternative")
-    html = _build_onboarding_html(client_name, client_email=client_email, temp_password=temp_password)
+    html = _build_onboarding_html(client_name, client_email=client_email, temp_password=temp_password, setup_url=setup_url)
 
     show_payment = bool(payment_url) or EMAIL_FORCE_PAYPAL_SECTION
     intro_steps = "los dos pasos" if show_payment else "el paso"
@@ -175,7 +177,7 @@ def send_onboarding_email(
 
     html = html.replace("__INTRO_STEPS__", intro_steps)
     html = html.replace("__PASSWORD_STEP_NUM__", password_step_num)
-    html = html.replace("__LOGIN_URL__", APP_LOGIN_URL or "#")
+    html = html.replace("__SETUP_URL__", setup_url or APP_LOGIN_URL or "#")
 
     if show_payment:
         effective_payment_url = payment_url or EMAIL_PAYPAL_PREVIEW_URL or "#"
@@ -251,9 +253,9 @@ if __name__ == "__main__":
     print("=== Test gmail_ops ===")
     print(f"Gmail configurado: {'sí' if GMAIL_ADDRESS else 'no'}")
     print(f"PDF existe: {'sí' if PDF_PATH.exists() else 'no'}")
-    html = _build_onboarding_html("Test Client", client_email="test@example.com", temp_password="TempPass123")
+    html = _build_onboarding_html("Test Client", client_email="test@example.com", temp_password="TempPass123", setup_url="https://app.acemsystems.com/auth/confirm?token_hash=test&type=magiclink&next=/update-password")
     html = html.replace("__INTRO_STEPS__", "los dos pasos")
     html = html.replace("__PASSWORD_STEP_NUM__", "2")
     html = html.replace("__PAYMENT_SECTION__", "<!-- payment section -->")
-    html = html.replace("__LOGIN_URL__", "https://app.acemsystems.com")
+    html = html.replace("__SETUP_URL__", "https://app.acemsystems.com/auth/confirm?token_hash=test&type=magiclink&next=/update-password")
     print(f"HTML generado: {len(html)} chars")
