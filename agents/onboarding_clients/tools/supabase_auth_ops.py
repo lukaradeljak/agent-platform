@@ -197,24 +197,27 @@ def create_or_update_user_with_password(
     url = f"{_supabase_url()}/auth/v1/admin/users"
     payload: dict = {"email": email, "password": password, "email_confirm": True}
     if data:
-        payload["data"] = data
+        payload["user_metadata"] = data  # must be "user_metadata", not "data"
 
     resp = requests.post(url, headers=_admin_headers(), json=payload, timeout=30)
     if resp.status_code < 400:
         log.info(f"Usuario creado en Supabase: {email}")
         return "created"
 
-    # Usuario ya existe → actualizar contraseña
+    # Usuario ya existe → actualizar contraseña y metadata
     if resp.status_code == 422:
         log.info(f"Usuario ya existe, actualizando contraseña: {email}")
         user_id = get_user_id_by_email(email)
         if not user_id:
             raise RuntimeError(f"No se encontró el usuario {email} para actualizar")
         update_url = f"{_supabase_url()}/auth/v1/admin/users/{user_id}"
+        update_payload: dict = {"password": password}
+        if data:
+            update_payload["user_metadata"] = data  # also update metadata for existing users
         update_resp = requests.put(
             update_url,
             headers=_admin_headers(),
-            json={"password": password},
+            json=update_payload,
             timeout=30,
         )
         if update_resp.status_code < 400:
