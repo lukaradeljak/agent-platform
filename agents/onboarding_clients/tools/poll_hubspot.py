@@ -15,7 +15,7 @@ sys.path.insert(0, ".")
 from _helpers import setup_env, setup_logging
 from hubspot_ops import search_deals, get_deal, update_deal, get_deal_contact_email
 from gmail_ops import send_onboarding_email
-from supabase_auth_ops import create_or_update_user_with_password, generate_temp_password, generate_magic_link
+from supabase_auth_ops import create_or_update_user_with_password, generate_temp_password
 import os
 
 setup_env()
@@ -55,21 +55,13 @@ def handle_deal_won(deal_id: str):
         },
     )
 
-    # Generar magic link directo a /update-password (un solo click)
-    try:
-        setup_url = generate_magic_link(email=client_email, app_url=app_url)
-    except Exception as e:
-        log.warning(f"No se pudo generar magic link, el email mostrará solo la contraseña temporal: {e}")
-        setup_url = ""
-
-    # 2. Enviar email de bienvenida con magic link + contraseña temporal de respaldo
+    # 2. Enviar email de bienvenida con contraseña temporal
     send_onboarding_email(
         to=client_email,
         client_name=client_name,
         company_name=company_name,
         client_email=client_email,
         temp_password=temp_password,
-        setup_url=setup_url,
     )
     log.info(f"Email de bienvenida enviado a {client_email}")
 
