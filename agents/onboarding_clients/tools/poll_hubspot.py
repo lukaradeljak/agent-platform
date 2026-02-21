@@ -15,7 +15,7 @@ sys.path.insert(0, ".")
 from _helpers import setup_env, setup_logging
 from hubspot_ops import search_deals, get_deal, update_deal, get_deal_contact_email
 from gmail_ops import send_onboarding_email
-from supabase_auth_ops import get_password_setup_link, default_redirect_to
+from supabase_auth_ops import create_or_update_user_with_password, generate_temp_password
 import os
 
 setup_env()
@@ -42,22 +42,24 @@ def handle_deal_won(deal_id: str):
         update_deal(deal_id, {"onboarding_status": "new"})
         return False
 
-    # 1. Crear usuario en la app / generar link para crear contraseña
-    password_url = get_password_setup_link(
+    # 1. Crear usuario en Supabase con contraseña temporal
+    temp_password = generate_temp_password()
+    create_or_update_user_with_password(
         email=client_email,
-        redirect_to=default_redirect_to(),
+        password=temp_password,
         data={
             "client_name": client_name,
             "hubspot_deal_id": deal_id,
         },
     )
 
-    # 2. Enviar email de bienvenida
+    # 2. Enviar email de bienvenida con la contraseña temporal
     send_onboarding_email(
         to=client_email,
         client_name=client_name,
         company_name=company_name,
-        password_url=password_url,
+        client_email=client_email,
+        temp_password=temp_password,
     )
     log.info(f"Email de bienvenida enviado a {client_email}")
 

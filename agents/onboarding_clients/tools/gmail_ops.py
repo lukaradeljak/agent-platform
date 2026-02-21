@@ -16,6 +16,7 @@ log = setup_logging("gmail_ops")
 
 GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS", "")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+APP_LOGIN_URL = os.getenv("APP_LOGIN_URL", "").strip()
 PDF_PATH = Path(__file__).parent / "welcome_template.pdf"
 
 EMAIL_TEMPLATE_VERSION = "2026-02-18.5"
@@ -62,7 +63,7 @@ def _send_via_smtp(msg: MIMEMultipart) -> None:
         raise RuntimeError(f"No se pudo enviar email via SMTP (465/587): {e}") from last_err
 
 
-def _build_onboarding_html(client_name: str) -> str:
+def _build_onboarding_html(client_name: str, client_email: str = "", temp_password: str = "") -> str:
     """Genera el HTML del email de onboarding alineado al brand ACEM."""
     return f"""\
 <!DOCTYPE html>
@@ -90,25 +91,34 @@ def _build_onboarding_html(client_name: str) -> str:
 
 __PAYMENT_SECTION__
 
-  <!-- Paso 2: Acceso -->
+  <!-- Paso N: Acceso -->
   <tr><td style="padding: 10px 40px;">
     <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #182033; border-radius: 8px;">
       <tr><td style="padding: 20px 24px;">
         <p style="font-family: 'Manrope', Arial, sans-serif; color: #00E5FF; font-size: 13px; font-weight: bold; margin: 0 0 8px; letter-spacing: 0.5px;">
-          PASO __PASSWORD_STEP_NUM__ &mdash; CREA TU CONTRASENA
+          PASO __PASSWORD_STEP_NUM__ &mdash; ACCEDE A TU PANEL
+        </p>
+        <p style="font-family: 'Inter', Arial, sans-serif; color: #8899B0; font-size: 14px; line-height: 1.6; margin: 0 0 12px;">
+          Usa estas credenciales para acceder a tu panel:
+        </p>
+        <p style="font-family: 'Inter', Arial, sans-serif; color: #8899B0; font-size: 14px; line-height: 1.6; margin: 0 0 4px;">
+          <strong style="color: #E8EDF5;">Email:</strong> {client_email}
         </p>
         <p style="font-family: 'Inter', Arial, sans-serif; color: #8899B0; font-size: 14px; line-height: 1.6; margin: 0 0 16px;">
-          Para acceder a tu panel y al chat dentro de nuestro software,
-          usa el link a continuaci&oacute;n para crear o cambiar tu contrase&ntilde;a.
+          <strong style="color: #E8EDF5;">Contrase&ntilde;a temporal:</strong>&nbsp;
+          <code style="background: #0e1320; color: #00E5FF; padding: 3px 10px; border-radius: 4px; font-size: 15px; letter-spacing: 1px;">{temp_password}</code>
         </p>
         <table cellpadding="0" cellspacing="0"><tr><td style="border: 1.5px solid #00E5FF; border-radius: 6px;">
-          <a href="__PASSWORD_URL__"
+          <a href="__LOGIN_URL__"
              style="display: inline-block; color: #00E5FF; padding: 12px 32px;
                     text-decoration: none; font-family: 'Manrope', Arial, sans-serif;
                     font-size: 14px; font-weight: bold; letter-spacing: 0.5px;">
-            Crear contrase&ntilde;a
+            Iniciar sesi&oacute;n
           </a>
         </td></tr></table>
+        <p style="font-family: 'Inter', Arial, sans-serif; color: #5a6a80; font-size: 12px; line-height: 1.5; margin: 12px 0 0;">
+          Pod&eacute;s cambiar tu contrase&ntilde;a desde la configuraci&oacute;n de tu perfil una vez que ingreses.
+        </p>
       </td></tr>
     </table>
   </td></tr>
@@ -142,7 +152,8 @@ def send_onboarding_email(
     client_name: str,
     company_name: str | None = None,
     payment_url: str = "",
-    password_url: str = "",
+    client_email: str = "",
+    temp_password: str = "",
 ) -> bool:
     """
     Envía el email de onboarding con enlace de pago y PDF adjunto.
@@ -156,7 +167,7 @@ def send_onboarding_email(
 
     # HTML body
     html_part = MIMEMultipart("alternative")
-    html = _build_onboarding_html(client_name)
+    html = _build_onboarding_html(client_name, client_email=client_email, temp_password=temp_password)
 
     show_payment = bool(payment_url) or EMAIL_FORCE_PAYPAL_SECTION
     intro_steps = "los dos pasos" if show_payment else "el paso"
@@ -164,7 +175,7 @@ def send_onboarding_email(
 
     html = html.replace("__INTRO_STEPS__", intro_steps)
     html = html.replace("__PASSWORD_STEP_NUM__", password_step_num)
-    html = html.replace("__PASSWORD_URL__", password_url or "#")
+    html = html.replace("__LOGIN_URL__", APP_LOGIN_URL or "#")
 
     if show_payment:
         effective_payment_url = payment_url or EMAIL_PAYPAL_PREVIEW_URL or "#"
@@ -240,9 +251,9 @@ if __name__ == "__main__":
     print("=== Test gmail_ops ===")
     print(f"Gmail configurado: {'sí' if GMAIL_ADDRESS else 'no'}")
     print(f"PDF existe: {'sí' if PDF_PATH.exists() else 'no'}")
-    html = _build_onboarding_html("Test Client")
+    html = _build_onboarding_html("Test Client", client_email="test@example.com", temp_password="TempPass123")
     html = html.replace("__INTRO_STEPS__", "los dos pasos")
     html = html.replace("__PASSWORD_STEP_NUM__", "2")
     html = html.replace("__PAYMENT_SECTION__", "<!-- payment section -->")
-    html = html.replace("__PASSWORD_URL__", "https://example.com/reset")
+    html = html.replace("__LOGIN_URL__", "https://app.acemsystems.com")
     print(f"HTML generado: {len(html)} chars")

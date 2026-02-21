@@ -8,6 +8,8 @@ that we can send from our own Gmail onboarding email.
 from __future__ import annotations
 
 import os
+import secrets
+import string
 import requests
 
 from _helpers import setup_env, setup_logging
@@ -103,6 +105,78 @@ def get_password_setup_link(
             )
         # If the error is something else (bad creds, etc.), surface it.
         raise
+
+
+def generate_temp_password(length: int = 12) -> str:
+    """Genera una contraseña temporal segura."""
+    alphabet = string.ascii_letters + string.digits
+    password = [
+        secrets.choice(string.ascii_uppercase),
+        secrets.choice(string.ascii_lowercase),
+        secrets.choice(string.digits),
+    ]
+    password += [secrets.choice(alphabet) for _ in range(length - 3)]
+    secrets.SystemRandom().shuffle(password)
+    return "".join(password)
+
+
+def get_user_id_by_email(email: str) -> str | None:
+    """Busca el ID de un usuario por email via Admin API."""
+    url = f"{_supabase_url()}/auth/v1/admin/users"
+    resp = requests.get(
+        url,
+        headers=_admin_headers(),
+        params={"email": email, "page": 1, "per_page": 1},
+        timeout=30,
+    )
+    if resp.status_code >= 400:
+        return None
+    users = resp.json().get("users", [])
+    return users[0]["id"] if users else None
+
+
+def create_or_update_user_with_password(
+    *,
+    email: str,
+    password: str,
+    data: dict | None = None,
+) -> str:
+    """
+    Crea un usuario nuevo con la contraseña dada (email_confirm=True).
+    Si el usuario ya existe, actualiza su contraseña.
+    Retorna 'created' o 'updated'.
+    """
+    url = f"{_supabase_url()}/auth/v1/admin/users"
+    payload: dict = {"email": email, "password": password, "email_confirm": True}
+    if data:
+        payload["data"] = data
+
+    resp = requests.post(url, headers=_admin_headers(), json=payload, timeout=30)
+    if resp.status_code < 400:
+        log.info(f"Usuario creado en Supabase: {email}")
+        return "created"
+
+    # Usuario ya existe → actualizar contraseña
+    if resp.status_code == 422:
+        log.info(f"Usuario ya existe, actualizando contraseña: {email}")
+        user_id = get_user_id_by_email(email)
+        if not user_id:
+            raise RuntimeError(f"No se encontró el usuario {email} para actualizar")
+        update_url = f"{_supabase_url()}/auth/v1/admin/users/{user_id}"
+        update_resp = requests.put(
+            update_url,
+            headers=_admin_headers(),
+            json={"password": password},
+            timeout=30,
+        )
+        if update_resp.status_code < 400:
+            log.info(f"Contraseña actualizada para: {email}")
+            return "updated"
+        raise RuntimeError(
+            f"Error actualizando contraseña ({update_resp.status_code}): {update_resp.text}"
+        )
+
+    raise RuntimeError(f"Supabase create user failed ({resp.status_code}): {resp.text}")
 
 
 def default_redirect_to() -> str | None:
