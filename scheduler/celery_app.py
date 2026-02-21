@@ -16,7 +16,7 @@ app = Celery(
     "agent_platform",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["scheduler.tasks.runner"],
+    include=["scheduler.tasks.runner", "scheduler.tasks.sync"],
 )
 
 app.conf.timezone = "UTC"
@@ -47,5 +47,10 @@ app.conf.beat_schedule = {
         "task": "scheduler.tasks.runner.run_agent",
         "schedule": crontab(),
         "args": ("onboarding_clients",),
+    },
+    # Sync métricas → Supabase (para el dashboard del cliente)
+    "sync-platform-to-supabase": {
+        "task": "scheduler.tasks.sync.sync_platform_to_supabase",
+        "schedule": crontab(minute="*/5"),  # cada 5 minutos
     },
 }
