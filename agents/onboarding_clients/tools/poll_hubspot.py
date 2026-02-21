@@ -15,7 +15,12 @@ sys.path.insert(0, ".")
 from _helpers import setup_env, setup_logging
 from hubspot_ops import search_deals, get_deal, update_deal, get_deal_contact_email
 from gmail_ops import send_onboarding_email
-from supabase_auth_ops import create_or_update_user_with_password, generate_temp_password
+from supabase_auth_ops import (
+    create_or_update_user_with_password,
+    generate_temp_password,
+    get_user_id_by_email,
+    set_must_reset_password_in_profiles,
+)
 import os
 
 setup_env()
@@ -54,6 +59,11 @@ def handle_deal_won(deal_id: str):
             "must_reset_password": True,
         },
     )
+
+    # Actualizar profiles para que loginAction fuerce el cambio de contraseña
+    user_id = get_user_id_by_email(client_email)
+    if user_id:
+        set_must_reset_password_in_profiles(user_id)
 
     # 2. Enviar email de bienvenida con contraseña temporal
     send_onboarding_email(

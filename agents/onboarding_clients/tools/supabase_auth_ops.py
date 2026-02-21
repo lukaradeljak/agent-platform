@@ -160,6 +160,29 @@ def generate_magic_link(*, email: str, app_url: str) -> str:
     return f"{app_base}/auth/confirm?token_hash={hashed_token}&type=magiclink&next=/update-password"
 
 
+def set_must_reset_password_in_profiles(user_id: str) -> bool:
+    """
+    Actualiza must_reset_password=true en la tabla profiles via PostgREST.
+    Solo actualiza si ya existe la fila. Para usuarios nuevos sin perfil,
+    loginAction fallback al metadata (que también tiene must_reset_password=true).
+    Retorna True si se actualizó al menos una fila.
+    """
+    url = f"{_supabase_url()}/rest/v1/profiles"
+    headers = {**_admin_headers(), "Prefer": "return=minimal"}
+    resp = requests.patch(
+        url,
+        headers=headers,
+        params={"user_id": f"eq.{user_id}"},
+        json={"must_reset_password": True},
+        timeout=30,
+    )
+    if resp.status_code in (200, 204):
+        log.info(f"profiles.must_reset_password=true para user_id={user_id}")
+        return True
+    log.warning(f"No se pudo actualizar profiles ({resp.status_code}): {resp.text}")
+    return False
+
+
 def create_or_update_user_with_password(
     *,
     email: str,
