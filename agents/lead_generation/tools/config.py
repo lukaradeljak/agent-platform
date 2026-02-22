@@ -60,6 +60,10 @@ GMAIL_ADDRESS = os.getenv("GMAIL_ADDRESS", "")
 GMAIL_APP_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL", "") or GMAIL_ADDRESS  # defaults to same
 
+# --- Email send control ---
+# Set SKIP_EMAIL=true to run the pipeline without sending any emails (for testing)
+SKIP_EMAIL = _get_bool_env("SKIP_EMAIL", False)
+
 # --- GMass API (Outreach) ---
 GMASS_API_KEY = os.getenv("GMASS_API_KEY", "").strip()
 GMASS_API_BASE = "https://api.gmass.co/api"

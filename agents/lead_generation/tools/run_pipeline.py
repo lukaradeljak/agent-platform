@@ -14,7 +14,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from tools.config import LEADS_PER_DAY, RECIPIENT_EMAIL, GMAIL_ADDRESS, GMASS_API_KEY, DB_BACKEND
+from tools.config import LEADS_PER_DAY, RECIPIENT_EMAIL, GMAIL_ADDRESS, GMASS_API_KEY, DB_BACKEND, SKIP_EMAIL
 from tools.utils import setup_logging
 from tools import db_manager
 from tools import discover_leads
@@ -137,29 +137,34 @@ def main():
             logger.info("-" * 40)
             logger.info("Stage 5: Sending email...")
 
-            recipient = RECIPIENT_EMAIL or GMAIL_ADDRESS
-            subject = f"Informe Diario de Leads - {run_date} - {len(leads)} Agencias de Marketing"
+            if SKIP_EMAIL:
+                logger.info("  -> SKIP_EMAIL=true, omitiendo envío de email (modo prueba)")
+                lead_ids = [lead["id"] for lead in leads]
+                db_manager.mark_leads_sent(lead_ids, run_date)
+                stats["sent"] = len(leads)
+            else:
+                recipient = RECIPIENT_EMAIL or GMAIL_ADDRESS
+                subject = f"Informe Diario de Leads - {run_date} - {len(leads)} Agencias de Marketing"
 
-            try:
-                success = send_email.run(
-                    recipient=recipient,
-                    subject=subject,
-                    html_body=email_html,
-                    attachment_path=excel_path,
-                )
-                if success:
-                    # Mark leads as sent
-                    lead_ids = [lead["id"] for lead in leads]
-                    db_manager.mark_leads_sent(lead_ids, run_date)
-                    stats["sent"] = len(leads)
-                    logger.info(f"  -> Successfully sent {len(leads)} leads to {recipient}")
-                else:
+                try:
+                    success = send_email.run(
+                        recipient=recipient,
+                        subject=subject,
+                        html_body=email_html,
+                        attachment_path=excel_path,
+                    )
+                    if success:
+                        lead_ids = [lead["id"] for lead in leads]
+                        db_manager.mark_leads_sent(lead_ids, run_date)
+                        stats["sent"] = len(leads)
+                        logger.info(f"  -> Successfully sent {len(leads)} leads to {recipient}")
+                    else:
+                        stats["sent"] = 0
+                        errors.append("Email: send_email returned False")
+                except Exception as e:
+                    logger.error(f"  -> Email send FAILED: {e}")
                     stats["sent"] = 0
-                    errors.append("Email: send_email returned False")
-            except Exception as e:
-                logger.error(f"  -> Email send FAILED: {e}")
-                stats["sent"] = 0
-                errors.append(f"Email send: {str(e)}")
+                    errors.append(f"Email send: {str(e)}")
 
         # --- Stage 6: Personalized Outreach via GMass ---
         if GMASS_API_KEY:
