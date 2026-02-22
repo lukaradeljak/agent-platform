@@ -6,7 +6,7 @@ Sends individual, AI-generated emails to each lead via GMass.
 import logging
 import time
 
-from tools.config import AI_REQUEST_DELAY, GMASS_API_KEY, LEADS_PER_DAY, OUTREACH_TRANSPORT
+from tools.config import AI_REQUEST_DELAY, GMASS_API_KEY, LEADS_PER_DAY, OUTREACH_TRANSPORT, OUTREACH_DELAY_SECONDS
 from tools.db_manager import (
     get_leads_for_outreach,
     insert_outreach,
@@ -126,8 +126,10 @@ def run(limit=LEADS_PER_DAY):
             except Exception as e:
                 logger.error(f"    -> Error enviando email (GMass): {e}")
 
-        # Rate limiting - be nice to APIs
-        time.sleep(AI_REQUEST_DELAY)
+        # Delay anti-spam entre emails (configurable via OUTREACH_DELAY_SECONDS, default 180s)
+        if i < len(leads) - 1:
+            logger.info(f"    -> Esperando {OUTREACH_DELAY_SECONDS}s antes del próximo email...")
+            time.sleep(OUTREACH_DELAY_SECONDS)
 
     logger.info(f"Outreach completado: {sent_count}/{len(leads)} emails enviados")
     return sent_count

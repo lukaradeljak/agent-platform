@@ -72,6 +72,8 @@ FOLLOWUP_DAYS = 3  # Dias de espera antes de enviar followup
 GMASS_TRACK_OPENS = _get_bool_env("GMASS_TRACK_OPENS", False)
 GMASS_TRACK_CLICKS = _get_bool_env("GMASS_TRACK_CLICKS", False)
 OUTREACH_TRANSPORT = os.getenv("OUTREACH_TRANSPORT", "gmass").strip().lower()  # gmass|smtp
+# Delay entre emails de outreach para evitar detección de spam (default: 180s = 3 minutos)
+OUTREACH_DELAY_SECONDS = _get_int_env("OUTREACH_DELAY_SECONDS", 180)
 
 # --- Pipeline Settings ---
 LEADS_PER_DAY = _get_int_env("LEADS_PER_DAY", 30)
