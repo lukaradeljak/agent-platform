@@ -16,5 +16,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd /opt/agent-platform
+            git stash
             git pull origin main
-            docker compose up -d --build
+            docker compose up -d --build --remove-orphans
