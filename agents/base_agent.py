@@ -24,7 +24,8 @@ COLLECTOR_URL = os.getenv("COLLECTOR_URL", "http://collector:8000")
 
 
 class BaseAgent(ABC):
-    name: str  # Debe ser definido en cada subclase. Debe ser único globalmente.
+    name: str              # Debe ser definido en cada subclase. Debe ser único globalmente.
+    schedule: object | None = None  # e.g. crontab(), crontab(hour=8), 60.0 — None = sin schedule automático.
 
     @abstractmethod
     def run(self) -> dict[str, Any]:

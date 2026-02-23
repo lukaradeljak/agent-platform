@@ -87,11 +87,12 @@ Los servicios se descubren entre sí por nombre de servicio (e.g. `http://collec
 │
 ├── agents/                     # Todos los agentes
 │   ├── base_agent.py           # BaseAgent ABC — heredar siempre
-│   ├── registry.py             # Mapeo: agent_name → clase
+│   ├── registry.py             # Auto-discovery (NO editar para agregar agentes)
 │   └── <nombre_agente>/
 │       ├── __init__.py
-│       ├── agent.py            # Implementa BaseAgent
-│       └── requirements.txt    # Deps específicas del agente
+│       ├── agent.py            # Implementa BaseAgent + define name y schedule
+│       ├── requirements.txt    # Deps específicas del agente
+│       └── .env                # Secrets del agente (NO commitear — crear en el servidor)
 │
 ├── migrations/                 # Alembic — cambios de schema
 │   ├── env.py
@@ -105,17 +106,21 @@ Los servicios se descubren entre sí por nombre de servicio (e.g. `http://collec
 
 ---
 
-## Cómo Agregar un Agente Nuevo (3 Pasos)
+## Cómo Agregar un Agente Nuevo (1 Paso)
 
-### Paso 1 — Crear el agente
+Crear la carpeta del agente con estos archivos. **No necesitas tocar ningún otro archivo.**
+
+### El único archivo que escribes: `agents/mi_agente/agent.py`
 
 ```python
 # agents/mi_agente/agent.py
 from agents.base_agent import BaseAgent
+from celery.schedules import crontab
 from typing import Any
 
 class MiAgente(BaseAgent):
-    name = "mi_agente"          # Debe ser único. Este string es el identificador.
+    name = "mi_agente"              # Debe ser único. Este string es el identificador.
+    schedule = crontab(minute=0)    # Cada hora en punto. Ver ejemplos abajo.
 
     def run(self) -> dict[str, Any]:
         # ── Tu lógica aquí ──────────────────────────────
@@ -129,36 +134,34 @@ class MiAgente(BaseAgent):
         }
 ```
 
-### Paso 2 — Registrar el agente
-
+**Ejemplos de `schedule`:**
 ```python
-# agents/registry.py  — agregar la importación y la entrada
-from agents.mi_agente.agent import MiAgente
-
-AGENT_REGISTRY: dict[str, type] = {
-    # ... agentes existentes ...
-    "mi_agente": MiAgente,
-}
+schedule = crontab()                             # Cada minuto
+schedule = crontab(minute=0)                     # Cada hora en punto
+schedule = crontab(minute="*/15")                # Cada 15 minutos
+schedule = crontab(hour=6, minute=0)             # Todos los días a las 06:00 UTC
+schedule = crontab(hour=12, day_of_week="1-5")   # Lunes a viernes a las 12:00 UTC
+schedule = 60.0                                  # Cada 60 segundos
 ```
 
-### Paso 3 — Agendar la ejecución
+### Archivos requeridos en la carpeta
 
-```python
-# scheduler/celery_app.py  — agregar una entrada a beat_schedule
-app.conf.beat_schedule = {
-    # ... entradas existentes ...
-    "ejecutar-mi-agente-cada-hora": {
-        "task": "tasks.runner.run_agent",
-        "schedule": crontab(minute=0),      # Top de cada hora
-        "args": ("mi_agente",),
-    },
-}
+```
+agents/mi_agente/
+├── __init__.py          ← vacío, obligatorio
+├── agent.py             ← tu código + name + schedule
+├── requirements.txt     ← dependencias pip (puede estar vacío)
+└── .env                 ← secrets (crear en el servidor, NO commitear)
 ```
 
-Luego reconstruir:
+### Deploy
+
 ```bash
-make restart-scheduler
+git push   # GitHub Actions hace el deploy automáticamente
 ```
+
+El sistema detecta el agente nuevo, instala sus dependencias, y lo agenda — sin editar
+`registry.py`, `celery_app.py`, `Dockerfile`, ni `docker-compose.yml`.
 
 ---
 

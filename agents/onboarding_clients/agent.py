@@ -9,6 +9,8 @@ import sys
 import os
 from typing import Any
 
+from celery.schedules import crontab
+
 # Add tools directory to path so the tools' relative imports work
 _TOOLS_DIR = os.path.join(os.path.dirname(__file__), "tools")
 if _TOOLS_DIR not in sys.path:
@@ -19,6 +21,7 @@ from agents.base_agent import BaseAgent
 
 class OnboardingClientsAgent(BaseAgent):
     name = "onboarding_clients"
+    schedule = crontab()  # cada minuto
 
     def run(self) -> dict[str, Any]:
         from poll_hubspot import main

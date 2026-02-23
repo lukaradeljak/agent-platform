@@ -74,7 +74,7 @@ async def get_metrics(
     stmt = (
         select(AgentRun)
         .options(selectinload(AgentRun.metrics))
-        .order_by(AgentRun.started_at.asc())
+        .order_by(AgentRun.started_at.desc())
         .limit(limit)
     )
     if agent_name:
