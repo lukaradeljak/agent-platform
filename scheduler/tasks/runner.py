@@ -5,7 +5,13 @@ Esta es la única task que necesita existir. Todos los agentes usan esta misma t
 la diferencia está en el argumento `agent_name`.
 """
 
+import logging
+import os
+
+import httpx
 from celery import shared_task
+
+log = logging.getLogger(__name__)
 
 
 @shared_task(
@@ -24,6 +30,16 @@ def run_agent(self, agent_name: str) -> dict:
     Returns:
         dict con resultado de la ejecución.
     """
+    # Verificar si el agente está pausado
+    collector_url = os.environ.get("COLLECTOR_URL", "http://collector:8000")
+    try:
+        r = httpx.get(f"{collector_url}/agents/{agent_name}/control", timeout=5)
+        if r.status_code == 200 and r.json().get("paused"):
+            log.info(f"Agente '{agent_name}' pausado — ejecución omitida.")
+            return {"status": "skipped", "reason": "paused", "agent": agent_name}
+    except Exception as exc:
+        log.warning(f"No se pudo verificar estado de pausa para '{agent_name}': {exc}")
+
     # Importación tardía — evita circular imports y permite que el Dockerfile
     # del scheduler tenga acceso al directorio agents/
     from agents.registry import AGENT_REGISTRY

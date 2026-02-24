@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     Date,
     ForeignKey,
     Index,
@@ -96,3 +97,15 @@ class AgentDailySummary(Base):
     avg_duration_s: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
 
     __table_args__ = (UniqueConstraint("agent_name", "summary_date", name="uq_agent_date"),)
+
+
+class AgentControl(Base):
+    """Estado de control por agente (pausado/activo)."""
+
+    __tablename__ = "agent_control"
+
+    agent_name: Mapped[str] = mapped_column(String(100), primary_key=True)
+    paused: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )

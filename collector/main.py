@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI
 
-from collector.routers import health, metrics
+from collector.routers import agents, health, metrics
 
 app = FastAPI(
     title="Agent Metrics Collector",
@@ -12,3 +12,4 @@ app = FastAPI(
 
 app.include_router(health.router)
 app.include_router(metrics.router)
+app.include_router(agents.router)

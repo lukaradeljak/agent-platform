@@ -58,6 +58,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       SECRET_KEY:   ${COLLECTOR_SECRET_KEY}
+      REDIS_URL:    ${REDIS_URL}
+      CRON_SECRET:  ${CRON_SECRET}
     ports:
       - "8000:8000"
     healthcheck:
