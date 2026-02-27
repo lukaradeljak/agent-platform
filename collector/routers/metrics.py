@@ -64,7 +64,7 @@ async def push_metrics(
 async def get_metrics(
     agent_name: str | None = Query(None, description="Filtrar por nombre de agente"),
     started_after: datetime | None = Query(None, description="Solo runs con started_at posterior a esta fecha (ISO 8601)"),
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(500, ge=1, le=5000),
     db: AsyncSession = Depends(get_db),
 ) -> list[AgentRunSummary]:
     """
