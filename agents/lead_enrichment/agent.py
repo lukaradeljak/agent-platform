@@ -54,10 +54,8 @@ class LeadEnrichmentAgent(BaseAgent):
 
         if not leads_found:
             return {
-                "leads_encontrados": 0,
-                "emails_enviados": 0,
-                "errores_email": 0,
-                "pais": country,
+                "resultados": 0,
+                "errores": 0,
             }
 
         # ── Paso 2: Enviar emails ─────────────────────────────────────────
@@ -154,9 +152,6 @@ class LeadEnrichmentAgent(BaseAgent):
             pass  # El resumen es best-effort, no falla el agente
 
         return {
-            "leads_encontrados": leads_found,
-            "emails_enviados": emails_sent,
-            "errores_email": errors_count,
-            "pais": country,
-            "sheet_url": sheet_url,
+            "resultados": emails_sent,
+            "errores": errors_count,
         }
