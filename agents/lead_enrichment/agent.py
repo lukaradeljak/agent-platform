@@ -105,10 +105,51 @@ class LeadEnrichmentAgent(BaseAgent):
 
         smtp.quit()
 
-        # ── Paso 3: Resumen por email ─────────────────────────────────────
+        # ── Paso 3: Google Sheets ─────────────────────────────────────────
+        # Copia las credenciales OAuth al directorio temporal (writable) para
+        # que log_to_sheets pueda leer/escribir token.json al refrescarlo.
+        sheet_url = ""
         try:
-            import send_summary
-            send_summary.main()
+            import shutil
+            tmp_dir = Path("/app/.tmp")
+            tmp_dir.mkdir(exist_ok=True)
+
+            for cred_file in ("token.json", "client_secrets.json"):
+                src = Path(_AGENT_DIR) / cred_file
+                dst = tmp_dir / cred_file
+                if src.exists():
+                    shutil.copy2(src, dst)
+
+            # Cambia CWD temporalmente para que log_to_sheets encuentre los archivos
+            original_cwd = os.getcwd()
+            os.chdir(tmp_dir)
+            try:
+                import log_to_sheets
+                log_to_sheets.main()
+                url_file = tmp_dir / "sheet_url.txt"
+                if url_file.exists():
+                    sheet_url = url_file.read_text(encoding="utf-8").strip()
+                # Sincroniza token.json actualizado de vuelta al directorio del agente
+                refreshed = tmp_dir / "token.json"
+                if refreshed.exists():
+                    try:
+                        shutil.copy2(refreshed, Path(_AGENT_DIR) / "token.json")
+                    except Exception:
+                        pass  # agents dir es read-only en prod, ignorar
+            finally:
+                os.chdir(original_cwd)
+        except (SystemExit, Exception):
+            pass  # Sheets es best-effort, no falla el agente
+
+        # ── Paso 4: Resumen por email ─────────────────────────────────────
+        try:
+            original_cwd = os.getcwd()
+            os.chdir(Path("/app/.tmp"))
+            try:
+                import send_summary
+                send_summary.main()
+            finally:
+                os.chdir(original_cwd)
         except (SystemExit, Exception):
             pass  # El resumen es best-effort, no falla el agente
 
@@ -117,4 +158,5 @@ class LeadEnrichmentAgent(BaseAgent):
             "emails_enviados": emails_sent,
             "errores_email": errors_count,
             "pais": country,
+            "sheet_url": sheet_url,
         }
