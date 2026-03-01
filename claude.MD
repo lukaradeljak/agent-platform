@@ -351,6 +351,82 @@ curl -X POST http://localhost:8000/metrics \
 
 ---
 
+## Workflow: Agregar un Agente Nuevo a la App
+
+Cuando el usuario diga: **"agregá el agente en `<carpeta>`, que corra `<cuando>`, para la cuenta `<cuenta>`"**,
+seguir estos pasos exactamente:
+
+### Lo que el usuario tiene que darme
+- **Carpeta**: ruta local del proyecto del agente (ej. `C:\Users\luka\Desktop\proyectos ACEM\mi-agente`)
+- **Cuando**: horario en formato humano (ej. "lunes a viernes 9 AM" → `crontab(hour=12, minute=0, day_of_week="1-5")`)
+- **Cuenta**: nombre del cliente en la app (ej. "admin ACEM", "cliente X")
+
+### Pasos que ejecuto yo
+
+**1. Leer el proyecto**
+- Leer `workflows/*.md` para entender qué hace el agente
+- Leer todos los scripts en `tools/` para entender inputs/outputs
+- Identificar qué secrets necesita (API keys, credenciales)
+
+**2. Crear la carpeta del agente en el repo**
+```
+agents/<nombre>/
+├── __init__.py          ← vacío
+├── agent.py             ← BaseAgent con name, schedule, y run() que devuelve {"resultados": N, "errores": N}
+├── requirements.txt     ← deps del proyecto original
+└── tools/               ← copiar scripts del proyecto original
+    ├── __init__.py
+    └── *.py
+```
+
+**Reglas para `agent.py`:**
+- `name` = snake_case del nombre del agente
+- `schedule` = convertir horario humano a crontab (ART = UTC-3, sumar 3hs)
+- `run()` SIEMPRE retorna `{"resultados": N, "errores": N}` — nunca métricas específicas
+- Cargar `.env` del agente: `load_dotenv(os.path.join(_AGENT_DIR, ".env"), override=True)`
+- Importar tools via `sys.path.insert(0, _TOOLS_DIR)`
+
+**3. Crear `.env.example`** con todas las variables que necesita el agente
+
+**4. Deploy al VPS**
+```bash
+cd "C:\Users\luka\Desktop\sistema ACEM\deploy app"
+git add agents/<nombre>/
+git commit -m "Feature: agente <nombre>"
+git push   # GitHub Actions deploya al VPS automáticamente
+```
+
+**5. Crear el `.env` en el servidor**
+- SSH al VPS: `ssh root@46.225.112.251`
+- Crear: `nano /opt/agent-platform/agents/<nombre>/.env`
+- Pedirle al usuario los valores de cada variable
+
+**6. Inyectar run de prueba para que aparezca en la app**
+```bash
+# En el VPS:
+curl -X POST http://localhost:8000/metrics \
+  -H "Content-Type: application/json" \
+  -d '{"agent_name":"<nombre>","metrics":{"resultados":0,"errores":0},"started_at":"<now>Z","finished_at":"<now>Z","error":null}'
+```
+
+**7. Sincronizar a Supabase**
+- Abrir en browser (como admin): `https://app.acemsystems.com/api/cron/sync?reset_cursor=true`
+- Verificar que el agente aparece en la app
+
+**8. Asignar a cuenta específica** (si no es el admin ACEM)
+- Por defecto todos los agentes van al cliente `f95dfb74-bd25-4b83-bb0a-8984464fa368` (ACEM Platform / admin)
+- Para asignar a otro cliente: modificar `PLATFORM_LINK_EMAILS` en el `.env` del VPS para incluir el email del cliente, o asignar manualmente en Supabase
+
+### Conversión de horarios ART → UTC
+| ART | UTC (para crontab) |
+|-----|--------------------|
+| 09:00 | 12:00 |
+| 10:00 | 13:00 |
+| 18:00 | 21:00 |
+| 00:00 | 03:00 |
+
+---
+
 ## Makefile Reference
 
 ```
