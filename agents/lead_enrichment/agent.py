@@ -7,7 +7,6 @@ de 25-200 empleados, y les envía cold emails via Gmail.
 Corre lunes a viernes a las 09:00 ART (12:00 UTC).
 """
 
-import csv
 import os
 import smtplib
 import sys
@@ -24,7 +23,9 @@ from agents.base_agent import BaseAgent
 _AGENT_DIR = os.path.dirname(__file__)
 _TOOLS_DIR = os.path.join(_AGENT_DIR, "tools")
 
-_TMP_DIR = Path("/app/.tmp")
+# Cada agente usa su propia subcarpeta en /app/.tmp para evitar conflictos
+# cuando hay múltiples agentes corriendo en el mismo servidor.
+_TMP_DIR = Path("/app/.tmp/lead_enrichment")
 
 
 class LeadEnrichmentAgent(BaseAgent):
@@ -40,20 +41,23 @@ class LeadEnrichmentAgent(BaseAgent):
             sys.path.insert(0, _TOOLS_DIR)
 
         # ── Guard: una sola ejecución por día ─────────────────────────────
-        # Celery tiene max_retries=3. Sin este guard, si el agente falla a
-        # mitad de la campaña (error SMTP, rate limit), el reintento buscaría
-        # 40 leads NUEVOS en Apollo y mandaría emails adicionales.
-        # El .done file previene eso: si ya corrió hoy, salir de inmediato.
-        _TMP_DIR.mkdir(exist_ok=True)
+        _TMP_DIR.mkdir(parents=True, exist_ok=True)
         today_str = datetime.now().strftime("%Y-%m-%d")
-        done_file = _TMP_DIR / f"lead_enrichment_{today_str}.done"
+        done_file = _TMP_DIR / f"{today_str}.done"
         if done_file.exists():
             return {"resultados": 0, "errores": 0}
-        # Marcar ANTES de cualquier operación con efectos secundarios
         done_file.touch()
 
         import apollo_search as apollo
         import send_emails as emailer
+
+        # Redirigir todos los paths de los tools a la subcarpeta del agente
+        apollo.TMP_DIR = _TMP_DIR
+        apollo.OUTPUT_FILE = _TMP_DIR / "leads.csv"
+        apollo.ROTATION_STATE_FILE = _TMP_DIR / "country_rotation.json"
+        emailer.TMP_DIR = _TMP_DIR
+        emailer.LEADS_FILE = _TMP_DIR / "leads.csv"
+        emailer.LOG_FILE = _TMP_DIR / "sent_log.csv"
 
         api_key = os.getenv("APOLLO_API_KEY", "")
         gmail_user = os.getenv("GMAIL_USER", "")
@@ -65,13 +69,9 @@ class LeadEnrichmentAgent(BaseAgent):
         country = apollo.get_next_country(None)
         leads = apollo.search_people(api_key, country, 40)
         apollo.save_leads(leads)
-        leads_found = len(leads)
 
-        if not leads_found:
-            return {
-                "resultados": 0,
-                "errores": 0,
-            }
+        if not leads:
+            return {"resultados": 0, "errores": 0}
 
         # ── Paso 2: Enviar emails ─────────────────────────────────────────
         already_sent = emailer.load_already_sent()
@@ -116,16 +116,10 @@ class LeadEnrichmentAgent(BaseAgent):
                 "status": status,
             })
 
-            # Delay de 3 minutos entre emails (protege reputación del dominio)
             if i < len(pending) - 1:
                 time.sleep(emailer.DELAY_SECONDS)
 
         # ── Paso 3: Google Sheets ─────────────────────────────────────────
-        # Copia las credenciales OAuth al directorio temporal (writable) para
-        # que log_to_sheets pueda leer/escribir token.json al refrescarlo.
-        # Cambia CWD a /app/.tmp para que log_to_sheets encuentre token.json y
-        # client_secrets.json, pero monkeypatea LOG_FILE y SHEET_URL_FILE para
-        # que usen rutas absolutas (evita el bug de /app/.tmp/.tmp/...).
         sheet_url = ""
         try:
             import shutil
@@ -145,29 +139,25 @@ class LeadEnrichmentAgent(BaseAgent):
                 url_file = _TMP_DIR / "sheet_url.txt"
                 if url_file.exists():
                     sheet_url = url_file.read_text(encoding="utf-8").strip()
-                # Sincroniza token.json actualizado de vuelta al directorio del agente
                 refreshed = _TMP_DIR / "token.json"
                 if refreshed.exists():
                     try:
                         shutil.copy2(refreshed, Path(_AGENT_DIR) / "token.json")
                     except Exception:
-                        pass  # agents dir es read-only en prod, ignorar
+                        pass
             finally:
                 os.chdir(original_cwd)
         except (SystemExit, Exception):
-            pass  # Sheets es best-effort, no falla el agente
+            pass
 
         # ── Paso 4: Resumen por email ─────────────────────────────────────
-        # send_summary no necesita credenciales de Google — no cambiar CWD.
-        # Monkeypatea LOG_FILE y SHEET_URL_FILE con rutas absolutas para que
-        # encuentre los archivos correctos en /app/.tmp/.
         try:
             import send_summary
             send_summary.LOG_FILE = _TMP_DIR / "sent_log.csv"
             send_summary.SHEET_URL_FILE = _TMP_DIR / "sheet_url.txt"
             send_summary.main()
         except (SystemExit, Exception):
-            pass  # El resumen es best-effort, no falla el agente
+            pass
 
         return {
             "resultados": emails_sent,
