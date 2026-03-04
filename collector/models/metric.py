@@ -46,6 +46,7 @@ class AgentRunSummary(BaseModel):
     agent_name: str
     started_at: datetime
     finished_at: datetime | None
+    created_at: datetime | None = None  # DB insertion time — usado como cursor de sync
     status: str
     error_message: str | None
     metrics: dict[str, Any]

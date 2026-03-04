@@ -64,6 +64,14 @@ async def push_metrics(
 async def get_metrics(
     agent_name: str | None = Query(None, description="Filtrar por nombre de agente"),
     started_after: datetime | None = Query(None, description="Solo runs con started_at posterior a esta fecha (ISO 8601)"),
+    created_after: datetime | None = Query(
+        None,
+        description=(
+            "Solo runs insertados en DB después de esta fecha. "
+            "Usar este parámetro (en lugar de started_after) como cursor de sync para agentes "
+            "de larga duración: su started_at puede ser horas anterior a la inserción en DB."
+        ),
+    ),
     limit: int = Query(500, ge=1, le=5000),
     db: AsyncSession = Depends(get_db),
 ) -> list[AgentRunSummary]:
@@ -71,16 +79,27 @@ async def get_metrics(
     Retorna runs recientes con sus métricas.
     Útil para el web app, sync con Supabase y debugging manual.
     """
-    stmt = (
-        select(AgentRun)
-        .options(selectinload(AgentRun.metrics))
-        .order_by(AgentRun.started_at.desc())
-        .limit(limit)
-    )
+    if created_after:
+        # Ordenar por created_at ASC para paginar hacia adelante en el tiempo
+        stmt = (
+            select(AgentRun)
+            .options(selectinload(AgentRun.metrics))
+            .where(AgentRun.created_at > created_after)
+            .order_by(AgentRun.created_at.asc())
+            .limit(limit)
+        )
+    else:
+        stmt = (
+            select(AgentRun)
+            .options(selectinload(AgentRun.metrics))
+            .order_by(AgentRun.started_at.desc())
+            .limit(limit)
+        )
+        if started_after:
+            stmt = stmt.where(AgentRun.started_at > started_after)
+
     if agent_name:
         stmt = stmt.where(AgentRun.agent_name == agent_name)
-    if started_after:
-        stmt = stmt.where(AgentRun.started_at > started_after)
 
     result = await db.execute(stmt)
     runs = result.scalars().all()
@@ -101,6 +120,7 @@ def _run_to_summary(run: AgentRun) -> AgentRunSummary:
         agent_name=run.agent_name,
         started_at=run.started_at,
         finished_at=run.finished_at,
+        created_at=run.created_at,
         status=run.status,
         error_message=run.error_message,
         metrics=metrics,
