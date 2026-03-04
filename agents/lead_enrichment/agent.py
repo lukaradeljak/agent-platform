@@ -24,6 +24,8 @@ from agents.base_agent import BaseAgent
 _AGENT_DIR = os.path.dirname(__file__)
 _TOOLS_DIR = os.path.join(_AGENT_DIR, "tools")
 
+_TMP_DIR = Path("/app/.tmp")
+
 
 class LeadEnrichmentAgent(BaseAgent):
     name = "lead_enrichment"
@@ -36,6 +38,19 @@ class LeadEnrichmentAgent(BaseAgent):
 
         if _TOOLS_DIR not in sys.path:
             sys.path.insert(0, _TOOLS_DIR)
+
+        # ── Guard: una sola ejecución por día ─────────────────────────────
+        # Celery tiene max_retries=3. Sin este guard, si el agente falla a
+        # mitad de la campaña (error SMTP, rate limit), el reintento buscaría
+        # 40 leads NUEVOS en Apollo y mandaría emails adicionales.
+        # El .done file previene eso: si ya corrió hoy, salir de inmediato.
+        _TMP_DIR.mkdir(exist_ok=True)
+        today_str = datetime.now().strftime("%Y-%m-%d")
+        done_file = _TMP_DIR / f"lead_enrichment_{today_str}.done"
+        if done_file.exists():
+            return {"resultados": 0, "errores": 0}
+        # Marcar ANTES de cualquier operación con efectos secundarios
+        done_file.touch()
 
         import apollo_search as apollo
         import send_emails as emailer
@@ -106,29 +121,30 @@ class LeadEnrichmentAgent(BaseAgent):
         # ── Paso 3: Google Sheets ─────────────────────────────────────────
         # Copia las credenciales OAuth al directorio temporal (writable) para
         # que log_to_sheets pueda leer/escribir token.json al refrescarlo.
+        # Cambia CWD a /app/.tmp para que log_to_sheets encuentre token.json y
+        # client_secrets.json, pero monkeypatea LOG_FILE y SHEET_URL_FILE para
+        # que usen rutas absolutas (evita el bug de /app/.tmp/.tmp/...).
         sheet_url = ""
         try:
             import shutil
-            tmp_dir = Path("/app/.tmp")
-            tmp_dir.mkdir(exist_ok=True)
-
             for cred_file in ("token.json", "client_secrets.json"):
                 src = Path(_AGENT_DIR) / cred_file
-                dst = tmp_dir / cred_file
+                dst = _TMP_DIR / cred_file
                 if src.exists():
                     shutil.copy2(src, dst)
 
-            # Cambia CWD temporalmente para que log_to_sheets encuentre los archivos
             original_cwd = os.getcwd()
-            os.chdir(tmp_dir)
+            os.chdir(_TMP_DIR)
             try:
                 import log_to_sheets
+                log_to_sheets.LOG_FILE = _TMP_DIR / "sent_log.csv"
+                log_to_sheets.SHEET_URL_FILE = _TMP_DIR / "sheet_url.txt"
                 log_to_sheets.main()
-                url_file = tmp_dir / "sheet_url.txt"
+                url_file = _TMP_DIR / "sheet_url.txt"
                 if url_file.exists():
                     sheet_url = url_file.read_text(encoding="utf-8").strip()
                 # Sincroniza token.json actualizado de vuelta al directorio del agente
-                refreshed = tmp_dir / "token.json"
+                refreshed = _TMP_DIR / "token.json"
                 if refreshed.exists():
                     try:
                         shutil.copy2(refreshed, Path(_AGENT_DIR) / "token.json")
@@ -140,14 +156,14 @@ class LeadEnrichmentAgent(BaseAgent):
             pass  # Sheets es best-effort, no falla el agente
 
         # ── Paso 4: Resumen por email ─────────────────────────────────────
+        # send_summary no necesita credenciales de Google — no cambiar CWD.
+        # Monkeypatea LOG_FILE y SHEET_URL_FILE con rutas absolutas para que
+        # encuentre los archivos correctos en /app/.tmp/.
         try:
-            original_cwd = os.getcwd()
-            os.chdir(Path("/app/.tmp"))
-            try:
-                import send_summary
-                send_summary.main()
-            finally:
-                os.chdir(original_cwd)
+            import send_summary
+            send_summary.LOG_FILE = _TMP_DIR / "sent_log.csv"
+            send_summary.SHEET_URL_FILE = _TMP_DIR / "sheet_url.txt"
+            send_summary.main()
         except (SystemExit, Exception):
             pass  # El resumen es best-effort, no falla el agente
 
