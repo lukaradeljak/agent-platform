@@ -81,11 +81,6 @@ class LeadEnrichmentAgent(BaseAgent):
         emails_sent = 0
         errors_count = 0
 
-        smtp = smtplib.SMTP("smtp.gmail.com", 587)
-        smtp.ehlo()
-        smtp.starttls()
-        smtp.login(gmail_user, gmail_password)
-
         for i, lead in enumerate(pending):
             first_name = lead.get("first_name", "").strip() or "Hola"
             company = lead.get("company", "").strip() or "su empresa"
@@ -95,10 +90,19 @@ class LeadEnrichmentAgent(BaseAgent):
             subject = emailer.build_subject(subject_template, company)
             body = emailer.build_body(first_name, company, signature)
 
+            # Conexión nueva por email: evita que Gmail cierre la conexión
+            # después de ~30 min de inactividad (3 min/email × 10 emails = 30 min).
             status = "sent"
             try:
-                emailer.send_email(smtp, gmail_user, email, subject, body)
-                emails_sent += 1
+                smtp = smtplib.SMTP("smtp.gmail.com", 587)
+                smtp.ehlo()
+                smtp.starttls()
+                smtp.login(gmail_user, gmail_password)
+                try:
+                    emailer.send_email(smtp, gmail_user, email, subject, body)
+                    emails_sent += 1
+                finally:
+                    smtp.quit()
             except Exception as exc:
                 status = f"error: {exc}"
                 errors_count += 1
@@ -115,8 +119,6 @@ class LeadEnrichmentAgent(BaseAgent):
             # Delay de 3 minutos entre emails (protege reputación del dominio)
             if i < len(pending) - 1:
                 time.sleep(emailer.DELAY_SECONDS)
-
-        smtp.quit()
 
         # ── Paso 3: Google Sheets ─────────────────────────────────────────
         # Copia las credenciales OAuth al directorio temporal (writable) para
