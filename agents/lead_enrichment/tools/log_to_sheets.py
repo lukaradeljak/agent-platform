@@ -37,8 +37,8 @@ SHEET_URL_FILE = Path(".tmp/sheet_url.txt")
 CLIENT_SECRETS_FILE = "client_secrets.json"
 TOKEN_FILE = "token.json"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-HEADERS = ["Empresa", "Nombre", "Email", "Pais", "Fecha de envio", "Estado"]
-CSV_FIELDS = ["company", "name", "email", "country", "sent_at", "status"]
+HEADERS = ["Empresa", "Nombre", "Email", "Teléfono", "Pais", "Fecha de envio", "Estado"]
+CSV_FIELDS = ["company", "name", "email", "phone", "country", "sent_at", "status"]
 
 
 def get_credentials() -> Credentials:
@@ -114,7 +114,7 @@ def main():
     ws.update_title("Enviados")
 
     ws.update([HEADERS] + rows, value_input_option="USER_ENTERED")
-    ws.format("A1:F1", {"textFormat": {"bold": True}})
+    ws.format("A1:G1", {"textFormat": {"bold": True}})
 
     Path(".tmp").mkdir(exist_ok=True)
     SHEET_URL_FILE.write_text(sheet_url, encoding="utf-8")

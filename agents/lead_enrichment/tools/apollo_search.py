@@ -221,6 +221,9 @@ def search_people(api_key: str, country: str, limit: int) -> list[dict]:
 
             seen_emails.add(email)
 
+            phone_numbers = enriched.get("phone_numbers") or []
+            phone = phone_numbers[0].get("sanitized_number", "") if phone_numbers else ""
+
             leads.append({
                 "first_name": enriched.get("first_name", ""),
                 "last_name": enriched.get("last_name", ""),
@@ -229,6 +232,7 @@ def search_people(api_key: str, country: str, limit: int) -> list[dict]:
                 "company": (enriched.get("organization") or {}).get("name", ""),
                 "country": country,
                 "linkedin_url": enriched.get("linkedin_url", ""),
+                "phone": phone,
             })
             time.sleep(1.5)  # polite delay between enrichments
 
@@ -240,7 +244,7 @@ def search_people(api_key: str, country: str, limit: int) -> list[dict]:
 
 def save_leads(leads: list[dict]):
     TMP_DIR.mkdir(exist_ok=True)
-    fieldnames = ["first_name", "last_name", "email", "title", "company", "country", "linkedin_url"]
+    fieldnames = ["first_name", "last_name", "email", "title", "company", "country", "linkedin_url", "phone"]
     with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()

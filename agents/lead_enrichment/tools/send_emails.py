@@ -81,13 +81,13 @@ def init_log():
     if not LOG_FILE.exists():
         TMP_DIR.mkdir(exist_ok=True)
         with open(LOG_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["company", "name", "email", "country", "sent_at", "status"])
+            writer = csv.DictWriter(f, fieldnames=["company", "name", "email", "phone", "country", "sent_at", "status"])
             writer.writeheader()
 
 
 def append_log(row: dict):
     with open(LOG_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["company", "name", "email", "country", "sent_at", "status"])
+        writer = csv.DictWriter(f, fieldnames=["company", "name", "email", "phone", "country", "sent_at", "status"])
         writer.writerow(row)
 
 
@@ -194,6 +194,7 @@ def main():
                 "company": company,
                 "name": full_name,
                 "email": email,
+                "phone": lead.get("phone", ""),
                 "country": country,
                 "sent_at": datetime.now().isoformat(timespec="seconds"),
                 "status": status,
