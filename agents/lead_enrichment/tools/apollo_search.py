@@ -222,7 +222,11 @@ def search_people(api_key: str, country: str, limit: int) -> list[dict]:
             seen_emails.add(email)
 
             phone_numbers = enriched.get("phone_numbers") or []
-            phone = phone_numbers[0].get("sanitized_number", "") if phone_numbers else ""
+            phone = (
+                phone_numbers[0].get("sanitized_number", "")
+                if phone_numbers
+                else (enriched.get("organization") or {}).get("phone", "")
+            )
 
             leads.append({
                 "first_name": enriched.get("first_name", ""),
