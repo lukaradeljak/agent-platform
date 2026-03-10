@@ -69,8 +69,6 @@ TARGET_TITLES = [
     "Gerente General",
     "Founder",
     "Co-Founder",
-    "Managing Director",
-    "General Manager",
 ]
 
 TECH_KEYWORDS = [
@@ -80,6 +78,13 @@ TECH_KEYWORDS = [
     "inteligencia artificial", "web agency", "web studio",
     "ai-powered", "powered by ai", "machine learning", "fintech", "proptech",
     "healthtech", "edtech", "insurtech", "legaltech",
+]
+
+TITLE_VERIFY_KEYWORDS = [
+    "ceo", "coo", "cto", "cfo", "chief", "founder", "co-founder", "cofundador",
+    "director general", "director de operaciones", "gerente general",
+    "owner", "presidente", "president", "propietario", "dueño",
+    "socio director", "socio fundador",
 ]
 
 ROTATION_STATE_FILE = Path(".tmp/country_rotation.json")
@@ -214,6 +219,11 @@ def search_people(api_key: str, country: str, limit: int) -> list[dict]:
             if not email or "@" not in email or email in seen_emails:
                 continue
 
+            actual_title = (enriched.get("title") or "").lower()
+            if not any(kw in actual_title for kw in TITLE_VERIFY_KEYWORDS):
+                print(f"    Skipping non-target title: {enriched.get('title')}")
+                continue
+
             company_name = ((enriched.get("organization") or {}).get("name") or "").lower()
             if any(kw in company_name for kw in TECH_KEYWORDS):
                 print(f"    Skipping tech company: {company_name}")
@@ -222,11 +232,9 @@ def search_people(api_key: str, country: str, limit: int) -> list[dict]:
             seen_emails.add(email)
 
             phone_numbers = enriched.get("phone_numbers") or []
-            phone = (
-                phone_numbers[0].get("sanitized_number", "")
-                if phone_numbers
-                else (enriched.get("organization") or {}).get("phone", "")
-            )
+            phone = phone_numbers[0].get("sanitized_number", "") if phone_numbers else ""
+            if not phone:
+                phone = (enriched.get("organization") or {}).get("phone", "") or ""
 
             leads.append({
                 "first_name": enriched.get("first_name", ""),

@@ -36,6 +36,7 @@ load_dotenv()
 TMP_DIR = Path(".tmp")
 LEADS_FILE = TMP_DIR / "leads.csv"
 LOG_FILE = TMP_DIR / "sent_log.csv"
+CURRENT_RUN_LOG = TMP_DIR / "current_run_log.csv"
 
 DELAY_SECONDS = 3 * 60  # 3 minutes between sends
 
@@ -81,13 +82,30 @@ def init_log():
     if not LOG_FILE.exists():
         TMP_DIR.mkdir(exist_ok=True)
         with open(LOG_FILE, "w", newline="", encoding="utf-8") as f:
-            writer = csv.DictWriter(f, fieldnames=["company", "name", "email", "phone", "country", "sent_at", "status"])
+            writer = csv.DictWriter(f, fieldnames=LOG_FIELDS)
             writer.writeheader()
 
 
 def append_log(row: dict):
     with open(LOG_FILE, "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["company", "name", "email", "phone", "country", "sent_at", "status"])
+        writer = csv.DictWriter(f, fieldnames=LOG_FIELDS)
+        writer.writerow(row)
+
+
+LOG_FIELDS = ["company", "name", "email", "country", "phone", "sent_at", "status"]
+
+
+def init_current_run_log():
+    """Create/truncate the current-run log so it only contains this run's data."""
+    TMP_DIR.mkdir(exist_ok=True)
+    with open(CURRENT_RUN_LOG, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=LOG_FIELDS)
+        writer.writeheader()
+
+
+def append_current_run_log(row: dict):
+    with open(CURRENT_RUN_LOG, "a", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=LOG_FIELDS)
         writer.writerow(row)
 
 
@@ -148,6 +166,7 @@ def main():
         sys.exit(0)
 
     init_log()
+    init_current_run_log()
 
     if args.preview_to:
         print(f"PREVIEW MODE: all emails will be sent to {args.preview_to} (not to leads)\n")
@@ -190,15 +209,17 @@ def main():
             print(f"  FAILED: {e}")
 
         if not args.preview_to:
-            append_log({
+            log_row = {
                 "company": company,
                 "name": full_name,
                 "email": email,
-                "phone": lead.get("phone", ""),
                 "country": country,
+                "phone": lead.get("phone", ""),
                 "sent_at": datetime.now().isoformat(timespec="seconds"),
                 "status": status,
-            })
+            }
+            append_log(log_row)
+            append_current_run_log(log_row)
 
         if i < len(pending) and not args.preview_to:
             print(f"  Waiting 3 minutes before next send...\n")

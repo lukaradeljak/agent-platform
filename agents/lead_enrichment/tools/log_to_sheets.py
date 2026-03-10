@@ -32,13 +32,13 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 
 load_dotenv()
 
-LOG_FILE = Path(".tmp/sent_log.csv")
+LOG_FILE = Path(".tmp/current_run_log.csv")
 SHEET_URL_FILE = Path(".tmp/sheet_url.txt")
 CLIENT_SECRETS_FILE = "client_secrets.json"
 TOKEN_FILE = "token.json"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-HEADERS = ["Empresa", "Nombre", "Email", "Teléfono", "Pais", "Fecha de envio", "Estado"]
-CSV_FIELDS = ["company", "name", "email", "phone", "country", "sent_at", "status"]
+HEADERS = ["Empresa", "Nombre", "Email", "Pais", "Telefono", "Fecha de envio", "Estado"]
+CSV_FIELDS = ["company", "name", "email", "country", "phone", "sent_at", "status"]
 
 
 def get_credentials() -> Credentials:
