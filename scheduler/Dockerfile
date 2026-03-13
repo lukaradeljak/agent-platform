@@ -6,13 +6,17 @@ WORKDIR /app
 COPY scheduler/requirements.txt scheduler/requirements.txt
 RUN pip install --no-cache-dir -r scheduler/requirements.txt
 
-# Copiar código del proyecto
+# Copiar código del scheduler
 COPY scheduler/ scheduler/
-COPY agents/ agents/
 
-# Instalar deps de todos los agentes (se detectan automáticamente por requirements.txt)
-RUN find /app/agents -maxdepth 2 -name "requirements.txt" \
-      -exec pip install --no-cache-dir -r {} \;
+# Solo copiar base files de agents (no el código de agentes individuales).
+# El código de cada agente viene del volume mount /opt/agents:/app/agents:ro
+COPY agents/__init__.py agents/__init__.py
+COPY agents/base_agent.py agents/base_agent.py
+COPY agents/registry.py agents/registry.py
+
+# Deps de agentes se instalan en runtime (via deploy script de cada agente)
+# para que no haga falta rebuild de imagen cuando se agrega un agente nuevo.
 
 # Agregar el directorio raíz al PYTHONPATH para que los imports funcionen
 ENV PYTHONPATH=/app

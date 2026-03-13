@@ -18,4 +18,17 @@ jobs:
             cd /opt/agent-platform
             git stash
             git pull origin main
-            docker compose up -d --build --remove-orphans
+
+            # Copiar base files al directorio compartido de agentes
+            mkdir -p /opt/agents
+            cp agents/base_agent.py /opt/agents/base_agent.py
+            cp agents/registry.py /opt/agents/registry.py
+            cp agents/__init__.py /opt/agents/__init__.py
+
+            # Instalar deps de todos los agentes
+            for req in /opt/agents/*/requirements.txt; do
+              [ -f "$req" ] && docker compose exec -T celery_worker pip install -r "$req" 2>/dev/null || true
+            done
+
+            # Rebuild + force-recreate para que Celery re-importe schedules
+            docker compose up -d --build --force-recreate --remove-orphans

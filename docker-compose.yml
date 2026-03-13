@@ -89,7 +89,7 @@ services:
       CRON_SECRET:      ${CRON_SECRET}
     volumes:
       - agent_tmp_data:/app/.tmp
-      - ./agents:/app/agents:ro   # provee .env de todos los agentes en runtime (nunca van a git)
+      - /opt/agents:/app/agents:ro   # base files + código de cada agente
     command: celery -A scheduler.celery_app beat --loglevel=info
 
   # ─── Celery Worker (Executor) ────────────────────────────────────────
@@ -113,7 +113,7 @@ services:
       CRON_SECRET:      ${CRON_SECRET}
     volumes:
       - agent_tmp_data:/app/.tmp
-      - ./agents:/app/agents:ro   # provee .env de todos los agentes en runtime (nunca van a git)
+      - /opt/agents:/app/agents:ro   # base files + código de cada agente
     command: >
       celery -A scheduler.celery_app worker
         --loglevel=info
