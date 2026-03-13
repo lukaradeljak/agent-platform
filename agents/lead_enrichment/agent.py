@@ -37,6 +37,8 @@ class LeadEnrichmentAgent(BaseAgent):
         # Cargar secrets del agente
         load_dotenv(os.path.join(_AGENT_DIR, ".env"), override=True)
 
+        dry_run = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
+
         if _TOOLS_DIR not in sys.path:
             sys.path.insert(0, _TOOLS_DIR)
 
@@ -61,7 +63,6 @@ class LeadEnrichmentAgent(BaseAgent):
         emailer.LOG_FILE = _TMP_DIR / "sent_log.csv"
         emailer.CURRENT_RUN_LOG = _TMP_DIR / "current_run_log.csv"
 
-        dry_run = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
         api_key = os.getenv("APOLLO_API_KEY", "")
         gmail_user = os.getenv("GMAIL_USER", "")
         gmail_password = os.getenv("GMAIL_PASSWORD", "")
