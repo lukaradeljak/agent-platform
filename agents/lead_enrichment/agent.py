@@ -126,7 +126,7 @@ class LeadEnrichmentAgent(BaseAgent):
             emailer.append_log(log_row)
             emailer.append_current_run_log(log_row)
 
-            if i < len(pending) - 1:
+            if not dry_run and i < len(pending) - 1:
                 time.sleep(emailer.DELAY_SECONDS)
 
         # ── Paso 3: Google Sheets ─────────────────────────────────────────
