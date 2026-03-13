@@ -58,6 +58,7 @@ class LeadEnrichmentAgent(BaseAgent):
         emailer.TMP_DIR = _TMP_DIR
         emailer.LEADS_FILE = _TMP_DIR / "leads.csv"
         emailer.LOG_FILE = _TMP_DIR / "sent_log.csv"
+        emailer.CURRENT_RUN_LOG = _TMP_DIR / "current_run_log.csv"
 
         api_key = os.getenv("APOLLO_API_KEY", "")
         gmail_user = os.getenv("GMAIL_USER", "")
@@ -77,6 +78,7 @@ class LeadEnrichmentAgent(BaseAgent):
         already_sent = emailer.load_already_sent()
         pending = [lead for lead in leads if lead["email"] not in already_sent]
         emailer.init_log()
+        emailer.init_current_run_log()
 
         emails_sent = 0
         errors_count = 0
@@ -107,14 +109,17 @@ class LeadEnrichmentAgent(BaseAgent):
                 status = f"error: {exc}"
                 errors_count += 1
 
-            emailer.append_log({
+            log_row = {
                 "company": company,
                 "name": full_name,
                 "email": email,
                 "country": lead.get("country", ""),
+                "phone": lead.get("phone", ""),
                 "sent_at": datetime.now().isoformat(timespec="seconds"),
                 "status": status,
-            })
+            }
+            emailer.append_log(log_row)
+            emailer.append_current_run_log(log_row)
 
             if i < len(pending) - 1:
                 time.sleep(emailer.DELAY_SECONDS)
@@ -133,7 +138,7 @@ class LeadEnrichmentAgent(BaseAgent):
             os.chdir(_TMP_DIR)
             try:
                 import log_to_sheets
-                log_to_sheets.LOG_FILE = _TMP_DIR / "sent_log.csv"
+                log_to_sheets.LOG_FILE = _TMP_DIR / "current_run_log.csv"
                 log_to_sheets.SHEET_URL_FILE = _TMP_DIR / "sheet_url.txt"
                 log_to_sheets.main()
                 url_file = _TMP_DIR / "sheet_url.txt"
