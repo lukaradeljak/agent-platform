@@ -140,6 +140,7 @@ class LeadEnrichmentAgent(BaseAgent):
                 import log_to_sheets
                 log_to_sheets.LOG_FILE = _TMP_DIR / "current_run_log.csv"
                 log_to_sheets.SHEET_URL_FILE = _TMP_DIR / "sheet_url.txt"
+                log_to_sheets.MASTER_SHEET_ID_FILE = _TMP_DIR / "master_sheet_id.txt"
                 log_to_sheets.main()
                 url_file = _TMP_DIR / "sheet_url.txt"
                 if url_file.exists():
@@ -158,7 +159,7 @@ class LeadEnrichmentAgent(BaseAgent):
         # ── Paso 4: Resumen por email ─────────────────────────────────────
         try:
             import send_summary
-            send_summary.LOG_FILE = _TMP_DIR / "sent_log.csv"
+            send_summary.LOG_FILE = _TMP_DIR / "current_run_log.csv"
             send_summary.SHEET_URL_FILE = _TMP_DIR / "sheet_url.txt"
             send_summary.main()
         except (SystemExit, Exception):

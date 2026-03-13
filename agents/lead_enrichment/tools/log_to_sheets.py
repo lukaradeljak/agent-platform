@@ -34,6 +34,7 @@ load_dotenv()
 
 LOG_FILE = Path(".tmp/current_run_log.csv")
 SHEET_URL_FILE = Path(".tmp/sheet_url.txt")
+MASTER_SHEET_ID_FILE = Path(".tmp/master_sheet_id.txt")
 CLIENT_SECRETS_FILE = "client_secrets.json"
 TOKEN_FILE = "token.json"
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -93,6 +94,36 @@ def load_log() -> list[list]:
     return rows
 
 
+def append_to_master_sheet(creds: Credentials, rows: list[list]):
+    """Append rows to the persistent master sheet (historical log).
+    Creates it on first run and saves its ID for future appends.
+    """
+    gc = gspread.authorize(creds)
+
+    if MASTER_SHEET_ID_FILE.exists():
+        master_id = MASTER_SHEET_ID_FILE.read_text(encoding="utf-8").strip()
+        try:
+            spreadsheet = gc.open_by_key(master_id)
+            ws = spreadsheet.sheet1
+            ws.append_rows(rows, value_input_option="USER_ENTERED")
+            print(f"Historico: {len(rows)} fila(s) agregadas -> {spreadsheet.url}")
+            return
+        except Exception as e:
+            print(f"No se pudo abrir master sheet ({master_id}): {e}. Creando uno nuevo...")
+
+    master_id, master_url = create_spreadsheet(creds, "Lead Enrichment - Historico")
+    spreadsheet = gc.open_by_key(master_id)
+    ws = spreadsheet.sheet1
+    ws.update_title("Historico")
+    ws.update([HEADERS] + rows, value_input_option="USER_ENTERED")
+    ws.format("A1:G1", {"textFormat": {"bold": True}})
+
+    Path(".tmp").mkdir(exist_ok=True)
+    MASTER_SHEET_ID_FILE.write_text(master_id, encoding="utf-8")
+    print(f"Historico creado: {master_url}")
+    print(f"ID guardado -> {MASTER_SHEET_ID_FILE}")
+
+
 def main():
     rows = load_log()
     if not rows:
@@ -101,6 +132,7 @@ def main():
 
     creds = get_credentials()
 
+    # --- Sheet diario ---
     today = datetime.now().strftime("%Y-%m-%d")
     title = f"Campana {today}"
 
@@ -121,6 +153,12 @@ def main():
 
     print(f"Registradas {len(rows)} fila(s).")
     print(f"URL guardada -> {SHEET_URL_FILE}")
+
+    # --- Sheet histórico (append) ---
+    try:
+        append_to_master_sheet(creds, rows)
+    except Exception as e:
+        print(f"WARNING: No se pudo actualizar sheet historico: {e}")
 
 
 if __name__ == "__main__":
