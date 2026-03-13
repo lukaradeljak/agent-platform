@@ -44,9 +44,10 @@ class LeadEnrichmentAgent(BaseAgent):
         _TMP_DIR.mkdir(parents=True, exist_ok=True)
         today_str = datetime.now().strftime("%Y-%m-%d")
         done_file = _TMP_DIR / f"{today_str}.done"
-        if done_file.exists():
+        if not dry_run and done_file.exists():
             return {"resultados": 0, "errores": 0}
-        done_file.touch()
+        if not dry_run:
+            done_file.touch()
 
         import apollo_search as apollo
         import send_emails as emailer
@@ -60,6 +61,7 @@ class LeadEnrichmentAgent(BaseAgent):
         emailer.LOG_FILE = _TMP_DIR / "sent_log.csv"
         emailer.CURRENT_RUN_LOG = _TMP_DIR / "current_run_log.csv"
 
+        dry_run = os.getenv("DRY_RUN", "").lower() in ("1", "true", "yes")
         api_key = os.getenv("APOLLO_API_KEY", "")
         gmail_user = os.getenv("GMAIL_USER", "")
         gmail_password = os.getenv("GMAIL_PASSWORD", "")
@@ -92,22 +94,24 @@ class LeadEnrichmentAgent(BaseAgent):
             subject = emailer.build_subject(subject_template, company)
             body = emailer.build_body(first_name, company, signature)
 
-            # Conexión nueva por email: evita que Gmail cierre la conexión
-            # después de ~30 min de inactividad (3 min/email × 10 emails = 30 min).
-            status = "sent"
-            try:
-                smtp = smtplib.SMTP("smtp.gmail.com", 587)
-                smtp.ehlo()
-                smtp.starttls()
-                smtp.login(gmail_user, gmail_password)
+            if dry_run:
+                status = "dry_run"
+                emails_sent += 1
+            else:
+                status = "sent"
                 try:
-                    emailer.send_email(smtp, gmail_user, email, subject, body)
-                    emails_sent += 1
-                finally:
-                    smtp.quit()
-            except Exception as exc:
-                status = f"error: {exc}"
-                errors_count += 1
+                    smtp = smtplib.SMTP("smtp.gmail.com", 587)
+                    smtp.ehlo()
+                    smtp.starttls()
+                    smtp.login(gmail_user, gmail_password)
+                    try:
+                        emailer.send_email(smtp, gmail_user, email, subject, body)
+                        emails_sent += 1
+                    finally:
+                        smtp.quit()
+                except Exception as exc:
+                    status = f"error: {exc}"
+                    errors_count += 1
 
             log_row = {
                 "company": company,
