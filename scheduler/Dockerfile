@@ -15,11 +15,14 @@ COPY agents/__init__.py agents/__init__.py
 COPY agents/base_agent.py agents/base_agent.py
 COPY agents/registry.py agents/registry.py
 
-# Deps de agentes se instalan en runtime (via deploy script de cada agente)
-# para que no haga falta rebuild de imagen cuando se agrega un agente nuevo.
+# Entrypoint instala deps de agentes al arrancar (desde el volume mount)
+COPY scheduler/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
 # Agregar el directorio raíz al PYTHONPATH para que los imports funcionen
 ENV PYTHONPATH=/app
+
+ENTRYPOINT ["/entrypoint.sh"]
 
 # El comando se sobreescribe en docker-compose.yml por servicio:
 # celery_beat:   celery -A scheduler.celery_app beat
