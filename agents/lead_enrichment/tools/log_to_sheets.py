@@ -105,7 +105,7 @@ def append_to_master_sheet(creds: Credentials, rows: list[list]):
         try:
             spreadsheet = gc.open_by_key(master_id)
             ws = spreadsheet.sheet1
-            ws.append_rows(rows, value_input_option="USER_ENTERED")
+            ws.append_rows(rows, value_input_option="RAW")
             print(f"Historico: {len(rows)} fila(s) agregadas -> {spreadsheet.url}")
             return
         except Exception as e:
@@ -115,7 +115,7 @@ def append_to_master_sheet(creds: Credentials, rows: list[list]):
     spreadsheet = gc.open_by_key(master_id)
     ws = spreadsheet.sheet1
     ws.update_title("Historico")
-    ws.update([HEADERS] + rows, value_input_option="USER_ENTERED")
+    ws.update([HEADERS] + rows, value_input_option="RAW")
     ws.format("A1:G1", {"textFormat": {"bold": True}})
 
     Path(".tmp").mkdir(exist_ok=True)
@@ -145,7 +145,7 @@ def main():
     ws = spreadsheet.sheet1
     ws.update_title("Enviados")
 
-    ws.update([HEADERS] + rows, value_input_option="USER_ENTERED")
+    ws.update([HEADERS] + rows, value_input_option="RAW")
     ws.format("A1:G1", {"textFormat": {"bold": True}})
 
     Path(".tmp").mkdir(exist_ok=True)
