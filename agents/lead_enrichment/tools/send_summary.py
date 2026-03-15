@@ -39,7 +39,7 @@ def load_log() -> list[dict]:
 
 
 def build_summary(rows: list[dict], sheet_url: str) -> str:
-    sent = [r for r in rows if r.get("status") == "sent"]
+    sent = [r for r in rows if r.get("status") in ("sent", "dry_run")]
     errors = [r for r in rows if r.get("status", "").startswith("error")]
     by_country = Counter(r.get("country", "?") for r in sent)
 
